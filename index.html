@@ -2718,7 +2718,7 @@ function renderSidebar() {
   }
 
   list.innerHTML = filtered.map(shop => `
-    <div class="shop-card" id="shop-${shop.id}" onclick="selectShop(${shop.id})">
+    <div class="shop-card" id="shop-${shop.id}" onclick="selectShop('${shop.id}')">
       <div class="shop-card-top">
         <div class="shop-name">${shop.name}</div>
         <span class="shop-type-badge ${TYPE_BADGE[shop.type]}">${TYPE_LABELS[shop.type]}</span>
@@ -2938,7 +2938,7 @@ function renderMobCards() {
   const TYPE_ICON = { gold:'⚜', silver:'🥈', jewelry:'💎', coin:'🪙' };
 
   list.innerHTML = filtered.map(s => `
-      <div class="mob-card-item" onclick="mobSelectShop(${s.id})">
+      <div class="mob-card-item" onclick="mobSelectShop('${s.id}')">
         <div class="mob-card-info">
           <div class="mob-card-name">${s.name}</div>
           <span class="mob-card-badge" style="${BADGE_COLOR[s.type]||''}">${TYPE_LABELS[s.type]||''}</span>
