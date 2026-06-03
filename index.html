@@ -692,13 +692,13 @@
 
   .map-popup-name {
     font-size: 15px;
-    font-weight: 400;
+    font-weight: 700;
     color: var(--t1);
     margin-bottom: 6px;
     line-height: 1.3;
   }
 
-  .map-popup-divider { height: 1px; background: var(--border); margin: 0; }
+  .map-popup-divider { height: 1px; background: var(--border); margin: 12px 0 0; }
 
   .map-popup-detail {
     display: flex;
@@ -2475,6 +2475,26 @@ function autoLocate() {
 const SHOPS_CACHE_KEY = 'vimap_shops_cache';
 const SHOPS_CACHE_TTL = 5 * 60 * 1000; // 5 دقیقه
 
+/* ── نمایش ساعت کاری ── */
+function renderHoursBlock(hoursStr, isMobile) {
+  if (!hoursStr) return '';
+  const days = hoursStr.split('|').filter(Boolean);
+  if (!days.length) return '';
+  const rows = days.map(d => {
+    const idx = d.indexOf(':');
+    if (idx === -1) return '';
+    const name = d.slice(0, idx);
+    const val  = d.slice(idx + 1);
+    const closed = val.trim() === 'تعطیل';
+    const timeStr = closed ? 'تعطیل' : val.replace('-', ' – ');
+    const color = closed ? '#BA1A1A' : '#1A6B30';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:12px"><span style="color:#504539">${name}</span><span style="color:${color};font-weight:600">${timeStr}</span></div>`;
+  }).join('');
+  const sz = isMobile ? '16px' : '18px';
+  const mt = isMobile ? '4px' : '8px';
+  return `<div style="display:flex;align-items:flex-start;gap:8px;margin-top:${mt}"><span class="material-icons-round" style="font-size:${sz};color:#8B7355;margin-top:2px;flex-shrink:0">schedule</span><div style="flex:1">${rows}</div></div>`;
+}
+
 function escHtml(str) {
   if (!str) return '';
   return String(str)
@@ -2495,7 +2515,8 @@ function parseShops(data) {
     lat:     parseFloat(s.lat) || null,
     lng:     parseFloat(s.lng) || null,
     active:  s.active != 0 ? 1 : 0,
-    photos:  s.photos ? String(s.photos).split('\n').filter(l => l.trim()) : []
+    photos:  s.photos ? String(s.photos).split('\n').filter(l => l.trim()) : [],
+    hours:   s.hours || ''
   })).filter(s => s.active);
 }
 
@@ -2612,6 +2633,7 @@ function addMarker(shop) {
         <span class="material-icons-round">phone</span>
         <span dir="ltr" style="font-weight:700;color:#1A1916;font-size:15px">${shop.phone}</span>
       </div>
+      ${renderHoursBlock(shop.hours, false)}
       <div class="map-popup-actions">
         <button class="popup-action-btn" onclick="callShop('${shop.phone}')">
           <span class="material-icons-round">call</span>تماس با فروشگاه
@@ -2921,7 +2943,7 @@ function renderMobCards() {
           <div class="mob-card-name">${s.name}</div>
           <span class="mob-card-badge" style="${BADGE_COLOR[s.type]||''}">${TYPE_LABELS[s.type]||''}</span>
           <div class="mob-card-addr">📍 ${s.address}</div>
-          <div class="mob-card-phone">📞 ${s.phone}</div>
+          <div class="mob-card-phone">${s.phone} 📞</div>
         </div>
         <span class="material-icons-round mob-card-arrow">chevron_left</span>
       </div>`).join('');
@@ -2955,9 +2977,9 @@ function openMobSheet(shop) {
 
   document.getElementById('mob-sheet-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;direction:rtl">
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;flex-direction:column;gap:4px">
         <div style="font-size:17px;font-weight:700;color:var(--t1)">${shop.name}</div>
-        <span style="font-size:12px;padding:3px 10px;border-radius:20px;${BC[shop.type]||''}">${TL[shop.type]||shop.type}</span>
+        <span style="font-size:12px;padding:3px 10px;border-radius:20px;align-self:flex-start;${BC[shop.type]||''}">${TL[shop.type]||shop.type}</span>
       </div>
       <button onclick="closeMobSheet()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:20px;line-height:1;padding:0">✕</button>
     </div>
@@ -2971,6 +2993,7 @@ function openMobSheet(shop) {
         <span class="material-icons-round" style="font-size:16px;color:var(--t3)">phone</span>
         <span style="font-size:14px;font-weight:700;color:var(--t1);direction:ltr">${shop.phone}</span>
       </div>
+      ${renderHoursBlock(shop.hours, true)}
     </div>
     <button onclick="callShop('${shop.phone}')" style="width:100%;height:44px;border-radius:12px;background:var(--p);color:#fff;border:none;font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;margin-top:16px;display:flex;align-items:center;justify-content:center;gap:8px">
       <span class="material-icons-round" style="font-size:18px">call</span>تماس با فروشگاه
