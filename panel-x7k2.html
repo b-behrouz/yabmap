@@ -692,7 +692,7 @@ body {
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxno2Rniun8SyTUMWkFyoR606dGRV41BNHNCcYMXvSKaU041vZJn56MbbvGpXorJyqe8A/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOk3nLTbpahkQ3OuiNgUrmWbDLAInSA61dvINDPnzDIKUvyok694pTK9iTfcvqh_e8hg/exec';
 
 // ── STATE ─────────────────────────────────────────────────────────────
 let adminUser = '';
@@ -925,6 +925,8 @@ function clearForm() {
 document.addEventListener('DOMContentLoaded', initHours);
 
 // ── LOAD SHOPS ────────────────────────────────────────────────────────
+let shops = [];
+
 async function loadShops() {
   document.getElementById('table-sub').textContent = 'در حال بارگذاری...';
   return new Promise((resolve) => {
@@ -937,12 +939,13 @@ async function loadShops() {
       resolve();
     }, 10000);
 
-    window[cbName] = function(shops) {
+    window[cbName] = function(data) {
       clearTimeout(timer);
       document.head.removeChild(script);
       delete window[cbName];
-      renderTable(Array.isArray(shops) ? shops : []);
-      renderStats(Array.isArray(shops) ? shops : []);
+      shops = Array.isArray(data) ? data : [];
+      renderTable(shops);
+      renderStats(shops);
       resolve();
     };
 
@@ -1149,8 +1152,50 @@ function openEditModal(id) {
 
   // رندر ساعت کاری
   renderEditHours(shop.hours || '');
+
+  // نمایش عکس‌های فعلی
+  editNewPhotos = [];
+  const photoList = document.getElementById('edit-photo-list');
+  const existingPhotos = shop.photos || [];
+  photoList.innerHTML = existingPhotos.map((url, i) =>
+    `<div style="position:relative">
+      <img src="${url}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+      <button onclick="removeEditPhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--error);border:none;color:#fff;font-size:11px;cursor:pointer;line-height:1">✕</button>
+    </div>`
+  ).join('');
+  editRemainingPhotos = [...existingPhotos];
+
   document.getElementById('edit-status').style.display = 'none';
+  document.getElementById('edit-photo-progress').style.display = 'none';
   document.getElementById('edit-modal').classList.add('open');
+}
+
+let editNewPhotos = [];
+let editRemainingPhotos = [];
+
+function removeEditPhoto(idx) {
+  editRemainingPhotos.splice(idx, 1);
+  openEditModal(editShopId); // re-render
+}
+
+function handleEditPhotoSelect(input) {
+  const files = Array.from(input.files);
+  editNewPhotos = [...editNewPhotos, ...files].slice(0, 10);
+  const photoList = document.getElementById('edit-photo-list');
+  // نمایش پیش‌نمایش عکس‌های جدید
+  const newPreviews = editNewPhotos.map((f, i) =>
+    `<div style="position:relative">
+      <img src="${URL.createObjectURL(f)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--primary)">
+      <span style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:#fff;font-size:9px;text-align:center;border-radius:0 0 6px 6px">جدید</span>
+    </div>`
+  ).join('');
+  photoList.innerHTML = editRemainingPhotos.map((url, i) =>
+    `<div style="position:relative">
+      <img src="${url}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+      <button onclick="removeEditPhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--error);border:none;color:#fff;font-size:11px;cursor:pointer;line-height:1">✕</button>
+    </div>`
+  ).join('') + newPreviews;
+  input.value = '';
 }
 
 const DAYS_FA = ['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
@@ -1225,6 +1270,29 @@ async function confirmEdit() {
   status.textContent = 'در حال ذخیره...';
 
   try {
+    // آپلود عکس‌های جدید اگه بود
+    if (editNewPhotos.length > 0) {
+      status.textContent = 'در حال آپلود تصاویر...';
+      const prog = document.getElementById('edit-photo-progress');
+      prog.style.display = 'block';
+      for (let i = 0; i < editNewPhotos.length; i++) {
+        prog.textContent = `آپلود تصویر ${i+1} از ${editNewPhotos.length}...`;
+        const formData = new FormData();
+        formData.append('image', editNewPhotos[i]);
+        try {
+          // ذخیره به صورت base64 و ارسال به Apps Script
+          const b64 = await new Promise(r => {
+            const reader = new FileReader();
+            reader.onload = () => r(reader.result);
+            reader.readAsDataURL(editNewPhotos[i]);
+          });
+          editRemainingPhotos.push(b64); // موقتی — در savePhotoLinks واقعی ذخیره میشه
+        } catch(pe) {}
+      }
+      prog.style.display = 'none';
+    }
+
+    status.textContent = 'در حال ذخیره اطلاعات...';
     const res = await fetch(SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
@@ -1232,12 +1300,13 @@ async function confirmEdit() {
         action: 'editShop',
         u: adminUser, p: adminPass,
         id: editShopId, name, phone, address, type,
-        hours: getEditHoursValue()
+        hours: getEditHoursValue(),
+        photos: editRemainingPhotos
       })
     });
     const data = await res.json();
     if (data.ok) {
-      showToast('اطلاعات با موفقیت ذخیره شد');
+      showToast('اطلاعات با موفقیت ذخیره شد', 'success');
       closeEditModal();
       loadShops();
     } else {
