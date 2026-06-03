@@ -259,6 +259,24 @@ body {
 .type-option input { display: none; }
 .type-emoji { font-size: 18px; }
 
+.hours-row {
+  display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
+  background: var(--surface-var); border-radius: 8px;
+  padding: 8px 10px; font-size: 13px; direction: rtl;
+  box-sizing: border-box; width: 100%;
+}
+.hours-row.closed { opacity: 0.5; }
+.hours-row .day-name { width: 60px; min-width: 60px; font-weight: 600; color: var(--on-surface); flex-shrink: 0; }
+.hours-row input[type=time] {
+  border: 1.5px solid var(--outline-var); border-radius: 6px;
+  padding: 4px 4px; font-size: 12px; font-family: var(--font);
+  background: var(--surface); color: var(--on-surface); width: 78px; min-width: 78px;
+  direction: ltr; text-align: center; flex-shrink: 0;
+}
+.hours-row input[type=time]:disabled { opacity: 0.4; }
+.hours-row .sep { color: var(--on-surface-var); font-size: 12px; flex-shrink: 0; }
+.hours-closed-label { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--error); cursor: pointer; margin-right: auto; white-space: nowrap; flex-shrink: 0; }
+
 .form-hint {
   font-size: 11px; color: var(--on-surface-var); margin-top: 5px;
 }
@@ -532,7 +550,14 @@ body {
         </div>
         <input type="hidden" id="f-lat">
         <input type="hidden" id="f-lng">
-        <button class="btn btn-primary" onclick="submitShop()" id="submit-btn" style="margin-top:8px">
+
+        <!-- ساعت کاری -->
+        <div style="margin-top:16px">
+          <label style="font-weight:600;font-size:14px;color:var(--on-surface);display:block;margin-bottom:10px">ساعت کاری</label>
+          <div id="hours-rows" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="submitShop()" id="submit-btn" style="margin-top:16px">
           <span class="material-icons-round">add_location_alt</span>
           افزودن به نقشه
           <div class="spinner" id="submit-spinner"></div>
@@ -617,6 +642,48 @@ body {
   </div>
 </div>
 
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal" style="max-width:500px;width:95%">
+    <h3 style="margin-bottom:16px">ویرایش اطلاعات فروشگاه</h3>
+
+    <div style="display:flex;flex-direction:column;gap:12px;text-align:right">
+      <div>
+        <label style="font-size:13px;font-weight:600;color:var(--on-surface);display:block;margin-bottom:4px">نام فروشگاه *</label>
+        <input id="edit-name" class="inp" type="text" maxlength="80" style="width:100%;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:600;color:var(--on-surface);display:block;margin-bottom:4px">شماره تلفن *</label>
+        <input id="edit-phone" class="inp" type="tel" maxlength="15" dir="ltr" style="width:100%;box-sizing:border-box;text-align:right">
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:600;color:var(--on-surface);display:block;margin-bottom:4px">آدرس *</label>
+        <input id="edit-address" class="inp" type="text" maxlength="200" style="width:100%;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:600;color:var(--on-surface);display:block;margin-bottom:4px">نوع فروشگاه</label>
+        <div style="display:flex;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="radio" name="edit-type" value="gold"> طلافروشی
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="radio" name="edit-type" value="silver"> نقره‌فروشی
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div id="edit-status" style="display:none;font-size:13px;margin-top:12px;text-align:center"></div>
+
+    <div class="modal-btns" style="margin-top:20px">
+      <button class="btn btn-outline" onclick="closeEditModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="confirmEdit()" id="edit-confirm-btn">
+        <span class="material-icons-round">save</span>ذخیره
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="toast">
   <span class="material-icons-round" id="toast-icon">check_circle</span>
@@ -625,7 +692,7 @@ body {
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUV4uz3zZj8dAt50obUITFhAmUiLCLm3jl7-25DbcunVpBjJEzS6kOYJ12jEUVIa4wvw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxno2Rniun8SyTUMWkFyoR606dGRV41BNHNCcYMXvSKaU041vZJn56MbbvGpXorJyqe8A/exec';
 
 // ── STATE ─────────────────────────────────────────────────────────────
 let adminUser = '';
@@ -688,6 +755,57 @@ function doLogout() {
   document.getElementById('admin-app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('inp-pass').value = '';
+}
+
+// ── HOURS ─────────────────────────────────────────────────────────────
+const DAYS = ['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
+const DEFAULT_OPEN  = '09:00';
+const DEFAULT_CLOSE = '20:00';
+
+function initHours() {
+  const container = document.getElementById('hours-rows');
+  if (!container) return;
+  container.innerHTML = DAYS.map((day, i) => `
+    <div class="hours-row" id="hrow-${i}">
+      <span class="day-name">${day}</span>
+      <input type="time" id="h-open-${i}" value="${DEFAULT_OPEN}">
+      <span class="sep">–</span>
+      <input type="time" id="h-close-${i}" value="${DEFAULT_CLOSE}">
+      <label class="hours-closed-label">
+        <input type="checkbox" id="h-closed-${i}" onchange="toggleClosed(${i})"> تعطیل
+      </label>
+    </div>`).join('');
+}
+
+function toggleClosed(i) {
+  const closed = document.getElementById(`h-closed-${i}`).checked;
+  document.getElementById(`hrow-${i}`).classList.toggle('closed', closed);
+  document.getElementById(`h-open-${i}`).disabled  = closed;
+  document.getElementById(`h-close-${i}`).disabled = closed;
+}
+
+function getHoursValue() {
+  return DAYS.map((d, i) => {
+    const el = document.getElementById(`h-closed-${i}`);
+    if (!el) return `${d}:${DEFAULT_OPEN}-${DEFAULT_CLOSE}`;
+    if (el.checked) return `${d}:تعطیل`;
+    const open  = document.getElementById(`h-open-${i}`).value  || DEFAULT_OPEN;
+    const close = document.getElementById(`h-close-${i}`).value || DEFAULT_CLOSE;
+    return `${d}:${open}-${close}`;
+  }).join('|');
+}
+
+function resetHours() {
+  DAYS.forEach((_, i) => {
+    const el = document.getElementById(`h-open-${i}`);
+    if (!el) return;
+    document.getElementById(`h-open-${i}`).value    = DEFAULT_OPEN;
+    document.getElementById(`h-close-${i}`).value   = DEFAULT_CLOSE;
+    document.getElementById(`h-closed-${i}`).checked = false;
+    document.getElementById(`hrow-${i}`).classList.remove('closed');
+    document.getElementById(`h-open-${i}`).disabled  = false;
+    document.getElementById(`h-close-${i}`).disabled = false;
+  });
 }
 
 // ── TYPE SELECT ───────────────────────────────────────────────────────
@@ -800,7 +918,11 @@ async function submitShop() {
 function clearForm() {
   ['f-name','f-phone','f-address','f-lat','f-lng'].forEach(id => document.getElementById(id).value = '');
   selectType('gold', document.querySelector('.type-option'));
+  resetHours();
 }
+
+// init hours on page load
+document.addEventListener('DOMContentLoaded', initHours);
 
 // ── LOAD SHOPS ────────────────────────────────────────────────────────
 async function loadShops() {
@@ -864,6 +986,9 @@ function renderTable(shops) {
       <td><div class="table-address">${address}</div></td>
       <td>
         <div class="table-actions">
+          <button class="btn btn-outline btn-sm" title="ویرایش" onclick="openEditModal('${id}')">
+            <span class="material-icons-round">edit</span>
+          </button>
           <button class="btn btn-outline btn-sm" title="آپلود تصویر" onclick="openPhotoModal('${id}','${name.replace(/'/g,"\\'")}')">
             <span class="material-icons-round">photo_camera</span>
           </button>
@@ -1003,6 +1128,126 @@ function openDeleteModal(id, name) {
   deleteTargetId = id;
   document.getElementById('del-modal-text').textContent = `آیا مطمئن هستید که می‌خواهید «${name}» را حذف کنید؟`;
   document.getElementById('del-modal').classList.add('open');
+}
+
+// ─── EDIT MODAL ───
+let editShopId = null;
+
+function openEditModal(id) {
+  const shop = shops.find(s => String(s.id) === String(id));
+  if (!shop) return;
+  editShopId = id;
+
+  document.getElementById('edit-name').value = shop.name || '';
+  document.getElementById('edit-phone').value = shop.phone || '';
+  document.getElementById('edit-address').value = shop.address || '';
+
+  // انتخاب نوع
+  document.querySelectorAll('input[name="edit-type"]').forEach(r => {
+    r.checked = r.value === (shop.type || 'gold');
+  });
+
+  // رندر ساعت کاری
+  renderEditHours(shop.hours || '');
+  document.getElementById('edit-status').style.display = 'none';
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+const DAYS_FA = ['شنبه','یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه'];
+
+function renderEditHours(hoursStr) {
+  const container = document.getElementById('edit-hours-rows');
+  // parse ساعت‌های موجود
+  const parsed = {};
+  if (hoursStr) {
+    hoursStr.split(',').forEach(part => {
+      const [day, val] = part.split(':');
+      if (day !== undefined && val !== undefined) parsed[parseInt(day)] = val;
+    });
+  }
+  container.innerHTML = DAYS_FA.map((day, i) => {
+    const val = parsed[i] || '';
+    const isClosed = val === 'تعطیل';
+    const [start, end] = isClosed ? ['08:00','20:00'] : (val.split('-').length===2 ? val.split('-') : ['08:00','20:00']);
+    return `
+    <div class="hours-row" id="edit-hrow-${i}">
+      <span class="day-name">${day}</span>
+      <input type="time" id="edit-hs-${i}" value="${start}" ${isClosed?'disabled':''}>
+      <span class="sep">—</span>
+      <input type="time" id="edit-he-${i}" value="${end}" ${isClosed?'disabled':''}>
+      <label class="hours-closed-label">
+        <input type="checkbox" id="edit-hc-${i}" onchange="toggleEditClosed(${i})" ${isClosed?'checked':''}> تعطیل
+      </label>
+    </div>`;
+  }).join('');
+}
+
+function toggleEditClosed(i) {
+  const closed = document.getElementById('edit-hc-'+i).checked;
+  document.getElementById('edit-hs-'+i).disabled = closed;
+  document.getElementById('edit-he-'+i).disabled = closed;
+  document.getElementById('edit-hrow-'+i).classList.toggle('closed', closed);
+}
+
+function getEditHoursValue() {
+  return DAYS_FA.map((_, i) => {
+    const el = document.getElementById('edit-hc-'+i);
+    if (el && el.checked) return i+':تعطیل';
+    const s = document.getElementById('edit-hs-'+i)?.value || '08:00';
+    const e2 = document.getElementById('edit-he-'+i)?.value || '20:00';
+    return i+':'+s+'-'+e2;
+  }).join(',');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  editShopId = null;
+}
+
+async function confirmEdit() {
+  const name    = document.getElementById('edit-name').value.trim();
+  const phone   = document.getElementById('edit-phone').value.trim();
+  const address = document.getElementById('edit-address').value.trim();
+  const type    = document.querySelector('input[name="edit-type"]:checked')?.value || 'gold';
+  const status  = document.getElementById('edit-status');
+  const btn     = document.getElementById('edit-confirm-btn');
+
+  if (!name || !phone || !address) {
+    status.style.display = 'block';
+    status.style.color = 'var(--error)';
+    status.textContent = 'نام، تلفن و آدرس اجباری هستند';
+    return;
+  }
+
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.style.color = 'var(--on-surface-var)';
+  status.textContent = 'در حال ذخیره...';
+
+  try {
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'editShop',
+        u: adminUser, p: adminPass,
+        id: editShopId, name, phone, address, type,
+        hours: getEditHoursValue()
+      })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('اطلاعات با موفقیت ذخیره شد');
+      closeEditModal();
+      loadShops();
+    } else {
+      throw new Error(data.error || 'خطا در ذخیره');
+    }
+  } catch(e) {
+    status.style.color = 'var(--error)';
+    status.textContent = 'خطا: ' + e.message;
+  }
+  btn.disabled = false;
 }
 
 function closeModal() {
