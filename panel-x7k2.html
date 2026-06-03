@@ -637,8 +637,7 @@ let deleteTargetId = null;
 let _loginAttempts = 0;
 let _loginLockUntil = 0;
 
-async function doLogin() {
-  // جلوگیری از brute force
+function doLogin() {
   if (Date.now() < _loginLockUntil) {
     const remaining = Math.ceil((_loginLockUntil - Date.now()) / 1000);
     document.getElementById('login-error').textContent = `بیش از حد تلاش کردید. ${remaining} ثانیه صبر کنید.`;
@@ -651,37 +650,37 @@ async function doLogin() {
 
   setLoading('login-btn', 'login-spinner', true);
 
-  return new Promise(async (resolve) => {
-    try {
-      const res = await fetch(`${SCRIPT_URL}?action=verify&u=${encodeURIComponent(user)}&p=${encodeURIComponent(pass)}`);
-      const data = await res.json();
-      if (data.ok) {
-        adminUser = user; adminPass = pass;
-        _loginAttempts = 0; _loginLockUntil = 0;
-        document.getElementById('login-error').style.display = 'none';
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('admin-app').style.display = 'block';
-        document.getElementById('admin-name').textContent = user;
-        loadShops();
-      } else {
-        adminUser = ''; adminPass = '';
-        _loginAttempts++;
-        if (_loginAttempts >= 5) {
-          _loginLockUntil = Date.now() + 60000; // 1 دقیقه قفل
-          _loginAttempts = 0;
-          document.getElementById('login-error').textContent = 'بیش از حد تلاش کردید. ۶۰ ثانیه صبر کنید.';
-        }
-        document.getElementById('login-error').style.display = 'block';
+  const cbName = 'cb_verify_' + Date.now();
+  const script = document.createElement('script');
+  script.onerror = () => {
+    delete window[cbName];
+    document.getElementById('login-error').style.display = 'block';
+    setLoading('login-btn', 'login-spinner', false);
+  };
+  window[cbName] = function(data) {
+    delete window[cbName];
+    if (data.ok) {
+      adminUser = user; adminPass = pass;
+      _loginAttempts = 0; _loginLockUntil = 0;
+      document.getElementById('login-error').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('admin-app').style.display = 'block';
+      document.getElementById('admin-name').textContent = user;
+      loadShops();
+    } else {
+      adminUser = ''; adminPass = '';
+      _loginAttempts++;
+      if (_loginAttempts >= 5) {
+        _loginLockUntil = Date.now() + 60000;
+        _loginAttempts = 0;
+        document.getElementById('login-error').textContent = 'بیش از حد تلاش کردید. ۶۰ ثانیه صبر کنید.';
       }
-    } catch(e) {
       document.getElementById('login-error').style.display = 'block';
     }
     setLoading('login-btn', 'login-spinner', false);
-    resolve();
-
-    script.src = `${SCRIPT_URL}?action=verify&u=${encodeURIComponent(user)}&p=${encodeURIComponent(pass)}&callback=${cbName}`;
-    document.head.appendChild(script);
-  });
+  };
+  script.src = `${SCRIPT_URL}?action=verify&u=${encodeURIComponent(user)}&p=${encodeURIComponent(pass)}&callback=${cbName}`;
+  document.head.appendChild(script);
 }
 
 function doLogout() {
@@ -737,13 +736,18 @@ async function findLocation() {
 }
 
 async function geocodeAddress(address) {
-  // geocoding از طریق Apps Script (Google Maps)
-  try {
-    const res = await fetch(`${SCRIPT_URL}?action=geocode&address=${encodeURIComponent(address)}&u=${encodeURIComponent(adminUser)}&p=${encodeURIComponent(adminPass)}`);
-    const data = await res.json();
-    if (data.lat && data.lng) return { lat: data.lat, lng: data.lng };
-  } catch(e) {}
-  return { lat: null, lng: null };
+  return new Promise((resolve) => {
+    const cbName = 'cb_geo_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { delete window[cbName]; resolve({ lat: null, lng: null }); }, 8000);
+    script.onerror = () => { clearTimeout(timer); delete window[cbName]; resolve({ lat: null, lng: null }); };
+    window[cbName] = function(data) {
+      clearTimeout(timer); delete window[cbName];
+      resolve((data.lat && data.lng) ? { lat: data.lat, lng: data.lng } : { lat: null, lng: null });
+    };
+    script.src = `${SCRIPT_URL}?action=geocode&address=${encodeURIComponent(address)}&u=${encodeURIComponent(adminUser)}&p=${encodeURIComponent(adminPass)}&callback=${cbName}`;
+    document.head.appendChild(script);
+  });
 }
 
 async function submitShop() {
@@ -781,7 +785,7 @@ async function submitShop() {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action:'addShop', u: adminUser, p: adminPass, name, phone, address, type: selectedType, lat, lng })
+      body: JSON.stringify({ action:'addShop', u: adminUser, p: adminPass, name, phone, address, type: selectedType, lat, lng, hours: getHoursValue() })
     });
     showToast(lat ? 'طلافروشی با موقعیت روی نقشه اضافه شد ✓' : 'طلافروشی اضافه شد (موقعیت یافت نشد)', 'success');
     clearForm();
@@ -1010,18 +1014,21 @@ async function confirmDelete() {
   if (!deleteTargetId) return;
   const btn = document.getElementById('del-confirm-btn');
   btn.disabled = true;
-  try {
-    await fetch(`${SCRIPT_URL}?action=delete&id=${deleteTargetId}&u=${encodeURIComponent(adminUser)}&p=${encodeURIComponent(adminPass)}`, {
-      redirect: 'follow', mode: 'cors', credentials: 'omit'
-    });
-    showToast('طلافروشی حذف شد', 'success');
-    closeModal();
-    setTimeout(loadShops, 1000);
-  } catch {
-    showToast('خطا در حذف', 'error');
-  } finally {
-    btn.disabled = false;
-  }
+  const id = deleteTargetId;
+  return new Promise((resolve) => {
+    const cbName = 'cb_del_' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => { delete window[cbName]; showToast('خطا در حذف', 'error'); btn.disabled = false; resolve(); }, 8000);
+    script.onerror = () => { clearTimeout(timer); delete window[cbName]; showToast('خطا در حذف', 'error'); btn.disabled = false; resolve(); };
+    window[cbName] = function(data) {
+      clearTimeout(timer); delete window[cbName];
+      if (data.ok) { showToast('طلافروشی حذف شد', 'success'); closeModal(); setTimeout(loadShops, 1000); }
+      else showToast('خطا در حذف', 'error');
+      btn.disabled = false; resolve();
+    };
+    script.src = `${SCRIPT_URL}?action=delete&id=${encodeURIComponent(id)}&u=${encodeURIComponent(adminUser)}&p=${encodeURIComponent(adminPass)}&callback=${cbName}`;
+    document.head.appendChild(script);
+  });
 }
 
 // ── UTILS ─────────────────────────────────────────────────────────────
