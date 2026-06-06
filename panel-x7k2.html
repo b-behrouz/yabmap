@@ -692,7 +692,9 @@ body {
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzUV4uz3zZj8dAt50obUITFhAmUiLCLm3jl7-25DbcunVpBjJEzS6kOYJ12jEUVIa4wvw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWat1K8Fbf6NfGUohZ6Ryw0-dOEt7P59GGlaeIFyKR7DYrmDs896fhBnNv7tGK8Dddaw/exec';
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'zarrin1234';
 
 // ── STATE ─────────────────────────────────────────────────────────────
 let adminUser = '';
@@ -715,58 +717,26 @@ function doLogin() {
   const pass = document.getElementById('inp-pass').value;
   if (!user || !pass) { showToast('نام کاربری و رمز عبور را وارد کنید', 'error'); return; }
 
-  setLoading('login-btn', 'login-spinner', true);
-
-  // لاگین با JSONP (سازگار با Apps Script)
-  const cbName = 'cb_verify_' + Date.now();
-  const script = document.createElement('script');
-
-  const timer = setTimeout(() => {
-    document.head.removeChild(script);
-    delete window[cbName];
-    document.getElementById('login-error').textContent = 'خطا در اتصال. دوباره تلاش کنید.';
-    document.getElementById('login-error').style.display = 'block';
-    setLoading('login-btn', 'login-spinner', false);
-  }, 10000);
-
-  script.onerror = () => {
-    clearTimeout(timer);
-    try { document.head.removeChild(script); } catch(e) {}
-    delete window[cbName];
-    document.getElementById('login-error').textContent = 'خطا در اتصال به سرور.';
-    document.getElementById('login-error').style.display = 'block';
-    setLoading('login-btn', 'login-spinner', false);
-  };
-
-  window[cbName] = function(data) {
-    clearTimeout(timer);
-    try { document.head.removeChild(script); } catch(e) {}
-    delete window[cbName];
-    if (data && data.ok) {
-      adminUser = user; adminPass = pass;
-      _loginAttempts = 0; _loginLockUntil = 0;
-      document.getElementById('login-error').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('admin-app').style.display = 'block';
-      document.getElementById('admin-name').textContent = user;
-      loadShops();
+  if (user === ADMIN_USER && pass === ADMIN_PASS) {
+    adminUser = user; adminPass = pass;
+    _loginAttempts = 0; _loginLockUntil = 0;
+    document.getElementById('login-error').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('admin-app').style.display = 'block';
+    document.getElementById('admin-name').textContent = user;
+    loadShops();
+  } else {
+    adminUser = ''; adminPass = '';
+    _loginAttempts++;
+    if (_loginAttempts >= 5) {
+      _loginLockUntil = Date.now() + 60000;
+      _loginAttempts = 0;
+      document.getElementById('login-error').textContent = 'بیش از حد تلاش کردید. ۶۰ ثانیه صبر کنید.';
     } else {
-      adminUser = ''; adminPass = '';
-      _loginAttempts++;
-      if (_loginAttempts >= 5) {
-        _loginLockUntil = Date.now() + 60000;
-        _loginAttempts = 0;
-        document.getElementById('login-error').textContent = 'بیش از حد تلاش کردید. ۶۰ ثانیه صبر کنید.';
-      } else {
-        document.getElementById('login-error').textContent = 'نام کاربری یا رمز عبور اشتباه است';
-      }
-      document.getElementById('login-error').style.display = 'block';
+      document.getElementById('login-error').textContent = 'نام کاربری یا رمز عبور اشتباه است';
     }
-    setLoading('login-btn', 'login-spinner', false);
-  };
-
-  script.src = `${SCRIPT_URL}?action=verify&u=${encodeURIComponent(user)}&p=${encodeURIComponent(pass)}&callback=${cbName}`;
-  document.head.appendChild(script);
+    document.getElementById('login-error').style.display = 'block';
+  }
 }
 
 function doLogout() {
