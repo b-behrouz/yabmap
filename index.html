@@ -692,7 +692,7 @@
 
   .map-popup-name {
     font-size: 15px;
-    font-weight: 700;
+    font-weight: 400;
     color: var(--t1);
     margin-bottom: 6px;
     line-height: 1.3;
@@ -707,10 +707,14 @@
     padding: 0 16px;
     margin-bottom: 8px;
     font-size: 13px;
+    font-weight: 400;
     color: var(--t2);
     line-height: 1.5;
+    direction: rtl;
+    text-align: right;
   }
   .map-popup-detail:first-of-type { margin-top: 12px; }
+  .map-popup-detail:first-child { margin-top: 12px; }
 
   .map-popup-detail .material-icons-round {
     font-size: 16px;
@@ -2515,7 +2519,7 @@ function parseShops(data) {
     lat:     parseFloat(s.lat) || null,
     lng:     parseFloat(s.lng) || null,
     active:  s.active != 0 ? 1 : 0,
-    photos:  s.photos ? String(s.photos).split('\n').filter(l => l.trim()) : [],
+    photos:  s.photos ? String(s.photos).split('\n').filter(l => l.trim().startsWith('http')) : [],
     hours:   s.hours || ''
   })).filter(s => s.active);
 }
@@ -2607,17 +2611,17 @@ function addMarker(shop) {
       <div class="popup-gallery-track" id="pgt-${shop.id}">
         ${photos.map((url, i) => `
           <div class="popup-gallery-slide" onclick="openLightbox('${shop.id}',${i})">
-            <img src="${url}" alt="تصویر ${i+1}" loading="lazy">
+            <img src="${url}" alt="تصویر ${i+1}" loading="lazy" onerror="this.parentElement.style.display='none'">
           </div>`).join('')}
       </div>
     </div>` : '';
 
   const popupContent = `
-    <div class="map-popup">
+    <div class="map-popup" style="direction:rtl">
       <div class="map-popup-header">
         <div></div>
         <div class="map-popup-title">
-          <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+          <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">
             <div class="map-popup-name">${shop.name}</div>
             <span class="shop-type-badge ${TYPE_BADGE[shop.type]}">${TYPE_LABELS[shop.type]}</span>
           </div>
@@ -2625,13 +2629,13 @@ function addMarker(shop) {
       </div>
       ${galleryHtml}
       ${photos.length ? '' : '<div class="map-popup-divider"></div>'}
-      <div class="map-popup-detail">
+      <div class="map-popup-detail" style="margin-top:12px">
         <span class="material-icons-round">location_on</span>
-        <span style="font-weight:600;color:#1A1916">${shop.address}</span>
+        <span style="font-weight:400;color:#1A1916;flex:1;text-align:right">${shop.address}</span>
       </div>
       <div class="map-popup-detail">
         <span class="material-icons-round">phone</span>
-        <span dir="ltr" style="font-weight:700;color:#1A1916;font-size:15px">${shop.phone}</span>
+        <span style="font-weight:400;color:#1A1916;font-size:15px;flex:1;text-align:right;direction:ltr">${shop.phone}</span>
       </div>
       ${renderHoursBlock(shop.hours, false)}
       <div class="map-popup-actions">
@@ -2978,7 +2982,7 @@ function openMobSheet(shop) {
   document.getElementById('mob-sheet-content').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;direction:rtl">
       <div style="display:flex;flex-direction:column;gap:4px">
-        <div style="font-size:17px;font-weight:700;color:var(--t1)">${shop.name}</div>
+        <div style="font-size:17px;font-weight:400;color:var(--t1)">${shop.name}</div>
         <span style="font-size:12px;padding:3px 10px;border-radius:20px;align-self:flex-start;${BC[shop.type]||''}">${TL[shop.type]||shop.type}</span>
       </div>
       <button onclick="closeMobSheet()" style="background:none;border:none;cursor:pointer;color:var(--t3);font-size:20px;line-height:1;padding:0">✕</button>
@@ -2987,11 +2991,11 @@ function openMobSheet(shop) {
     <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px">
       <div style="display:flex;align-items:flex-start;gap:8px">
         <span class="material-icons-round" style="font-size:16px;color:var(--t3);margin-top:2px">location_on</span>
-        <span style="font-size:13px;font-weight:600;color:var(--t1)">${shop.address}</span>
+        <span style="font-size:13px;font-weight:400;color:var(--t1)">${shop.address}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span class="material-icons-round" style="font-size:16px;color:var(--t3)">phone</span>
-        <span style="font-size:14px;font-weight:700;color:var(--t1);direction:ltr">${shop.phone}</span>
+        <span style="font-size:14px;font-weight:400;color:var(--t1);direction:ltr">${shop.phone}</span>
       </div>
       ${renderHoursBlock(shop.hours, true)}
     </div>
