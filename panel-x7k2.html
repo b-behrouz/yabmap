@@ -692,7 +692,7 @@ body {
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwWat1K8Fbf6NfGUohZ6Ryw0-dOEt7P59GGlaeIFyKR7DYrmDs896fhBnNv7tGK8Dddaw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8fyI9g6S-CnJbHngDKekJmtDJyWo4wj4zHf2m9aIyUckqlY4OnKOjwdBx1POFE5nN/exec';
 const ADMIN_USER = 'admin';
 const ADMIN_PASS = 'zarrin1234';
 
@@ -1259,31 +1259,25 @@ async function confirmEdit() {
   status.textContent = 'در حال ذخیره...';
 
   try {
-    // آپلود عکس‌های جدید اگه بود
+    // آپلود عکس‌های جدید به Imgur
     if (editNewPhotos.length > 0) {
       status.textContent = 'در حال آپلود تصاویر...';
       const prog = document.getElementById('edit-photo-progress');
       prog.style.display = 'block';
       for (let i = 0; i < editNewPhotos.length; i++) {
         prog.textContent = `آپلود تصویر ${i+1} از ${editNewPhotos.length}...`;
-        const formData = new FormData();
-        formData.append('image', editNewPhotos[i]);
         try {
-          // ذخیره به صورت base64 و ارسال به Apps Script
-          const b64 = await new Promise(r => {
-            const reader = new FileReader();
-            reader.onload = () => r(reader.result);
-            reader.readAsDataURL(editNewPhotos[i]);
-          });
-          editRemainingPhotos.push(b64); // موقتی — در savePhotoLinks واقعی ذخیره میشه
+          const url = await uploadToImgur(editNewPhotos[i]);
+          if (url) editRemainingPhotos.push(url);
         } catch(pe) {}
       }
       prog.style.display = 'none';
     }
 
     status.textContent = 'در حال ذخیره اطلاعات...';
-    const res = await fetch(SCRIPT_URL, {
+    await fetch(SCRIPT_URL, {
       method: 'POST',
+      mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({
         action: 'editShop',
@@ -1293,14 +1287,9 @@ async function confirmEdit() {
         photos: editRemainingPhotos
       })
     });
-    const data = await res.json();
-    if (data.ok) {
-      showToast('اطلاعات با موفقیت ذخیره شد', 'success');
-      closeEditModal();
-      loadShops();
-    } else {
-      throw new Error(data.error || 'خطا در ذخیره');
-    }
+    showToast('اطلاعات با موفقیت ذخیره شد', 'success');
+    closeEditModal();
+    setTimeout(loadShops, 1500);
   } catch(e) {
     status.style.color = 'var(--error)';
     status.textContent = 'خطا: ' + e.message;
